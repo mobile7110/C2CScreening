@@ -1,0 +1,38 @@
+# Core Frameworks
+google-adk         # Corrected package name
+streamlit
+
+# LLM Integration (OpenAI)
+openai
+
+# Airtable Integration
+pyairtable
+
+# Backend Utilities
+python-dotenv
+pydantic
+PyMuPDF         # For fitz
+python-docx    # For docx
+
+# Admin Portal Utilities
+pandas
+# bcrypt is installed as part of passlib[bcrypt] below
+passlib[bcrypt]  # Corrected to include bcrypt extras
+# Core Frameworks
+# google-adk         # REMOVED
+streamlit
+
+# LLM Integration (OpenAI via LiteLLM)
+openai
+litellm          # Explicitly add litellm for clarity, though openai might pull it in
+
+# Airtable Integration
+pyairtable
+
+# Backend Utilities
+python-dotenv
+pydantic
+PyMuPDF         # For fitz
+python-docx    # For docx
+
+# Note: Removed pandas and passlib[bcrypt] previously

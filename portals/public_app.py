@@ -80,36 +80,19 @@ default_state_values = {
     "selected_req_title": None,
     "req_display_map": {},
     "req_select_display": "",
-    "cand_name_in_form": "",
-    "cand_email_in_form": "",
-    "company_name_in_form": "",
-    "candidate_payout_pm_in_form": None,
-    "target_location_in_form": "",
-    "candidate_current_location_in_form": "",
-    "relocation_status_in_form": None,
-    "grad_year_confirm_in_form": None,
-    "cv_upload_in_form": None, # File uploader state
+    # Form input keys are now implicitly managed by the form itself when clear_on_submit=True
+    # We no longer need explicit keys here like "cand_name_in_form", etc. for default setting
+    # unless we want to pre-populate them *outside* the form context, which we don't.
     "analysis_result": None,
     "submitted_flag": False,
-    "clear_form_on_next_run": False # Flag to trigger clearing
+    # "clear_form_on_next_run": False # REMOVED this flag
 }
 for key, default_value in default_state_values.items():
     if key not in st.session_state:
         st.session_state[key] = default_value
 
-# --- Clear Form State if Flagged from Previous Run ---
-if st.session_state.get("clear_form_on_next_run", False):
-    logger.info("Clearing form input state for next run.")
-    st.session_state.cand_name_in_form = ""
-    st.session_state.cand_email_in_form = ""
-    st.session_state.company_name_in_form = ""
-    st.session_state.candidate_payout_pm_in_form = None
-    st.session_state.target_location_in_form = ""
-    st.session_state.candidate_current_location_in_form = ""
-    st.session_state.relocation_status_in_form = None
-    st.session_state.grad_year_confirm_in_form = None
-    # Cannot programmatically clear file uploader via state key assignment
-    st.session_state.clear_form_on_next_run = False # Reset the flag
+# --- REMOVED Manual Form Clearing Logic Block ---
+# The block checking for "clear_form_on_next_run" has been removed.
 
 # --- Main Application Logic ---
 
@@ -122,24 +105,27 @@ if not req_display_to_title_map:
 else:
     st.subheader("1. Select Client Requirement")
     req_options = [""] + sorted(list(req_display_to_title_map.keys()))
+    # Note: No 'index' needed here if we rely on default selection or the callback
     st.selectbox(
          "Select Requirement*", options=req_options,
          key="req_select_display",
          help="Select the target client requirement.",
          on_change=update_selected_requirement_info,
-         index=req_options.index(st.session_state.req_select_display) if st.session_state.req_select_display in req_options else 0
+         # index=req_options.index(st.session_state.req_select_display) if st.session_state.req_select_display in req_options else 0 # Optional: Can keep if preferred
     )
     st.divider()
 
-    with st.form("cv_submit_form", clear_on_submit=False):
+    # --- UPDATED form definition ---
+    with st.form("cv_submit_form", clear_on_submit=True): # Set clear_on_submit=True
         st.subheader("2. Candidate & Company Details")
         col2a, col2b = st.columns(2)
         with col2a:
-            st.text_input("Candidate Name*", placeholder="e.g., Jane Doe", key="cand_name_in_form", value=st.session_state.cand_name_in_form)
-            st.text_input("Candidate Email (Optional)", placeholder="e.g., name@example.com", key="cand_email_in_form", value=st.session_state.cand_email_in_form)
+            # Assign keys so we can read values after submission
+            cand_name_submitted = st.text_input("Candidate Name*", placeholder="e.g., Jane Doe", key="cand_name_in_form")
+            email_submitted = st.text_input("Candidate Email (Optional)", placeholder="e.g., name@example.com", key="cand_email_in_form")
         with col2b:
-            st.text_input("Company Name*", placeholder="e.g., Tech Solutions Inc.", key="company_name_in_form", value=st.session_state.company_name_in_form)
-            st.number_input("Candidate Budget in INR*", min_value=0.0, step=1000.0, format="%.0f", placeholder="e.g., 200000", help="Enter expected monthly compensation in INR.", key="candidate_payout_pm_in_form", value=st.session_state.candidate_payout_pm_in_form)
+            comp_name_submitted = st.text_input("Company Name*", placeholder="e.g., Tech Solutions Inc.", key="company_name_in_form")
+            payout_submitted = st.number_input("Candidate Budget in INR*", min_value=0.0, step=1000.0, format="%.0f", placeholder="e.g., 200000", help="Enter expected monthly compensation in INR.", key="candidate_payout_pm_in_form")
 
         st.subheader("3. Location Details & CV Upload")
         col3a, col3b = st.columns([3, 2])
@@ -153,88 +139,118 @@ else:
              else:
                  st.markdown("_(Select a Requirement above to see required locations)_")
 
-             st.text_input( "For which location are you applying for?*", placeholder="Enter one location from the list above", key="target_location_in_form", value=st.session_state.target_location_in_form, help="Type the specific required location this candidate is targeting." )
-             st.text_input( "Candidate's Current Location*", placeholder="e.g., Mumbai, India", key="candidate_current_location_in_form", value=st.session_state.candidate_current_location_in_form, help="Enter the candidate's current primary work location." )
+             final_target_location = st.text_input( "For which location are you applying for?*", placeholder="Enter one location from the list above", key="target_location_in_form", help="Type the specific required location this candidate is targeting." )
+             final_current_location = st.text_input( "Candidate's Current Location*", placeholder="e.g., Mumbai, India", key="candidate_current_location_in_form", help="Enter the candidate's current primary work location." )
         with col3b:
-             st.file_uploader( "Upload Candidate CV*", type=["pdf", "docx"], help="Upload resume (PDF/DOCX, max 10MB).", key="cv_upload_in_form" )
+             # Assign key to read the uploaded file state
+             cv_file_submitted = st.file_uploader( "Upload Candidate CV*", type=["pdf", "docx"], help="Upload resume (PDF/DOCX, max 10MB).", key="cv_upload_in_form" )
              st.markdown("<br/>", unsafe_allow_html=True)
              relocation_options = [
                  "Candidate is already in a required city/location",
                  "Candidate is elsewhere but WILL relocate to a required location"
              ]
-             # *** REMOVED index calculation and parameter ***
-             st.radio( "Candidate Location Status*", options=relocation_options, key="relocation_status_in_form", # index=relocation_index, # REMOVED
+             final_relocation_status = st.radio( "Candidate Location Status*", options=relocation_options, key="relocation_status_in_form", # index removed
                        help="Select candidate's situation relative to required location(s)." )
 
         st.subheader("4. Final Confirmation")
         grad_options = ["Yes", "No", "Not Applicable/Sure"]
-        # *** REMOVED index calculation and parameter ***
-        st.radio("Is graduation year clearly specified in the CV?*", options=grad_options, key="grad_year_confirm_in_form", # index=grad_index, # REMOVED
+        grad_confirm_submitted = st.radio("Is graduation year clearly specified in the CV?*", options=grad_options, key="grad_year_confirm_in_form", # index removed
                    horizontal=True)
 
+        # --- Submit button remains inside the form ---
         submitted = st.form_submit_button("Submit")
         if submitted:
             st.session_state.submitted_flag = True
             st.session_state.analysis_result = None
+            # Store submitted values in session_state temporarily AFTER submit is clicked,
+            # because the form widgets will clear on rerun if clear_on_submit=True.
+            # We need these values for the processing block below the form.
+            st.session_state.temp_submitted_data = {
+                "selected_req_title": st.session_state.selected_req_title, # Get title from state set by selectbox callback
+                "cv_file": cv_file_submitted,
+                "cand_name": cand_name_submitted,
+                "comp_name": comp_name_submitted,
+                "payout": payout_submitted,
+                "target_loc": final_target_location,
+                "current_loc": final_current_location,
+                "relo_status": final_relocation_status,
+                "grad_confirm": grad_confirm_submitted,
+                "email": email_submitted
+            }
+
 
 # --- Process Submission & Display Results (Triggered by submitted_flag) ---
 if st.session_state.submitted_flag:
     st.divider(); st.subheader("Analysis Results")
 
-    # Values are read *after* form submission guarantees state is updated
-    final_selected_req_title = st.session_state.selected_req_title
-    cv_file_submitted = st.session_state.cv_upload_in_form
-    cand_name_submitted = st.session_state.cand_name_in_form.strip()
-    comp_name_submitted = st.session_state.company_name_in_form.strip()
-    payout_submitted = st.session_state.candidate_payout_pm_in_form
-    final_target_location = st.session_state.target_location_in_form.strip()
-    final_current_location = st.session_state.candidate_current_location_in_form.strip()
-    final_relocation_status = st.session_state.relocation_status_in_form
-    grad_confirm_submitted = st.session_state.grad_year_confirm_in_form
-    email_submitted = st.session_state.cand_email_in_form.strip()
+    # Retrieve the temporarily stored data
+    submitted_data = st.session_state.get("temp_submitted_data", {})
 
+    # --- Read values from the stored dictionary ---
+    final_selected_req_title = submitted_data.get("selected_req_title")
+    cv_file_to_process = submitted_data.get("cv_file") # This is the UploadedFile object
+    cand_name_to_process = submitted_data.get("cand_name", "").strip()
+    comp_name_to_process = submitted_data.get("comp_name", "").strip()
+    payout_to_process = submitted_data.get("payout")
+    target_loc_to_process = submitted_data.get("target_loc", "").strip()
+    current_loc_to_process = submitted_data.get("current_loc", "").strip()
+    relo_status_to_process = submitted_data.get("relo_status")
+    grad_confirm_to_process = submitted_data.get("grad_confirm")
+    email_to_process = submitted_data.get("email", "").strip()
+
+    # Perform validation using the retrieved values
     validation_errors = []
     if not final_selected_req_title: validation_errors.append("Please select a Client Requirement.")
-    if not cv_file_submitted: validation_errors.append("Please upload the CV file.")
-    if not cand_name_submitted: validation_errors.append("Please enter Candidate Name.")
-    if not comp_name_submitted: validation_errors.append("Please enter Company Name.")
-    if not final_target_location: validation_errors.append("Please enter the Location Applying For.")
-    if not final_current_location: validation_errors.append("Please enter Current Location.")
-    # Validation now checks the state value *after* submission
-    if final_relocation_status is None: validation_errors.append("Please select Location Status.")
-    if payout_submitted is None or payout_submitted <= 0: validation_errors.append("Please enter valid Candidate Budget (> 0).")
-    if grad_confirm_submitted is None: validation_errors.append("Please confirm grad year presence in CV.")
+    if not cv_file_to_process: validation_errors.append("Please upload the CV file.") # Check the file object
+    if not cand_name_to_process: validation_errors.append("Please enter Candidate Name.")
+    if not comp_name_to_process: validation_errors.append("Please enter Company Name.")
+    if not target_loc_to_process: validation_errors.append("Please enter the Location Applying For.")
+    if not current_loc_to_process: validation_errors.append("Please enter Current Location.")
+    if relo_status_to_process is None: validation_errors.append("Please select Location Status.") # Check the value
+    if payout_to_process is None or payout_to_process <= 0: validation_errors.append("Please enter valid Candidate Budget (> 0).")
+    if grad_confirm_to_process is None: validation_errors.append("Please confirm grad year presence in CV.") # Check the value
 
     if validation_errors:
         st.error("Please fix the following errors in the form above:"); error_cols = st.columns(2)
         for i, error in enumerate(validation_errors): error_cols[i % 2].warning(f"- {error}")
+        # Reset submitted_flag so user can correct and resubmit
         st.session_state.submitted_flag = False
-    elif final_selected_req_title:
+        # Clear temp data if validation fails
+        if "temp_submitted_data" in st.session_state:
+            del st.session_state.temp_submitted_data
+    elif final_selected_req_title and cv_file_to_process: # Ensure these exist before proceeding
         progress_bar = st.progress(0, text="Initializing analysis..."); status_placeholder = st.empty(); status_placeholder.info("🚀 Connecting and preparing...")
         try:
-            cv_bytes = cv_file_submitted.getvalue(); cv_filename = cv_file_submitted.name
-            logger.info(f"Form validated. Analyzing '{cand_name_submitted}' for Req: '{final_selected_req_title}'")
+            # Get bytes and filename from the UploadedFile object
+            cv_bytes = cv_file_to_process.getvalue(); cv_filename = cv_file_to_process.name
+            logger.info(f"Form validated. Analyzing '{cand_name_to_process}' for Req: '{final_selected_req_title}'")
             progress_bar.progress(20, text="Performing AI analysis..."); status_placeholder.info("🧠 AI analysis in progress...")
 
+            # Pass the processed values to the analysis function
             analysis_result_dict = agent_runner.run_c2c_analysis(
                 position_title=final_selected_req_title, cv_filename=cv_filename, cv_file_bytes=cv_bytes,
-                candidate_email=email_submitted if email_submitted else None, candidate_name=cand_name_submitted, company_name=comp_name_submitted,
-                candidate_expected_payout_pm=float(payout_submitted), candidate_applying_for_location=final_target_location,
-                candidate_current_location=final_current_location, relocation_status=final_relocation_status, # Pass the state value
-                grad_year_confirmed_by_user=grad_confirm_submitted # Pass the state value
+                candidate_email=email_to_process if email_to_process else None, candidate_name=cand_name_to_process, company_name=comp_name_to_process,
+                candidate_expected_payout_pm=float(payout_to_process), candidate_applying_for_location=target_loc_to_process,
+                candidate_current_location=current_loc_to_process, relocation_status=relo_status_to_process,
+                grad_year_confirmed_by_user=grad_confirm_to_process
             )
             st.session_state.analysis_result = analysis_result_dict
             progress_bar.progress(100, text="Analysis Complete!"); status_placeholder.empty(); time.sleep(0.5); progress_bar.empty()
 
         except AttributeError as ae:
-             logger.error(f"Error accessing uploaded file: {ae}. Was a file uploaded?"); progress_bar.progress(100, text="Error!"); status_placeholder.error("Error processing uploaded file. Please ensure a CV is uploaded.")
-             st.error("Error Details: Could not read the uploaded CV file. Please re-upload.")
+             logger.error(f"Error accessing uploaded file: {ae}. Was a file uploaded correctly?"); progress_bar.progress(100, text="Error!"); status_placeholder.error("Error processing uploaded file. Please ensure a CV is uploaded.")
+             st.error("Error Details: Could not read the uploaded CV file. Please re-upload and try again.")
              st.session_state.analysis_result = { "status": "error", "reason": "CV file read error.", "error_message": "Could not read the uploaded CV file.", "questions": [], "candidate_id": None, "llm_response_log_id": None }
         except Exception as e:
             logger.exception("Error during analysis call in frontend."); progress_bar.progress(100, text="Error!"); status_placeholder.error("An unexpected application error occurred during analysis.")
             st.error(f"Error Details: {type(e).__name__}: {str(e)}")
             st.session_state.analysis_result = { "status": "error", "reason": "Application error during analysis.", "error_message": f"{type(e).__name__}: {str(e)}", "questions": [], "candidate_id": None, "llm_response_log_id": None }
+        finally:
+             # Clear temp data after processing (success or failure)
+             if "temp_submitted_data" in st.session_state:
+                 del st.session_state.temp_submitted_data
 
+    # --- Display results based on st.session_state.analysis_result ---
     if st.session_state.analysis_result:
         result_data = st.session_state.analysis_result
         analysis_status = result_data.get("status"); questions = result_data.get("questions", []); reason = result_data.get("reason", "N/A."); candidate_id = result_data.get("candidate_id"); error_message = result_data.get("error_message"); llm_log_id = result_data.get("llm_response_log_id")
@@ -245,8 +261,10 @@ if st.session_state.submitted_flag:
             st.warning(f"⚠️ Clarifications Needed: {reason}");
             if questions: st.markdown("**Please address these points in the form above and resubmit:**"); q_cols = st.columns(2); [q_cols[i % 2].markdown(f"{i+1}. {str(q)}") for i, q in enumerate(questions)]
             else: st.info("Check the reason above, update the form, and resubmit.")
+            # User needs to refill the cleared form to resubmit
         elif analysis_status == "rejected":
             st.error(f"❌ Candidate Not Matched: {reason}")
+            # Form is already cleared
         elif analysis_status == "matched":
             st.success(f"✅ Candidate Matched! Reason: {reason}")
             if candidate_id:
@@ -258,14 +276,18 @@ if st.session_state.submitted_flag:
                 with cols_cal[1]: st.link_button("Slot 2", "https://calendar.app.google/Pu6PXtBqGamA36C47", use_container_width=True)
                 with cols_cal[2]: st.link_button("Slot 3", "https://calendar.app.google/kHVa9aCLBrT2JjDy9", use_container_width=True)
 
-                st.session_state.clear_form_on_next_run = True
-                st.info("Form inputs (excluding file upload) will be cleared on the next interaction or page reload.")
+                # REMOVED flag setting and info message about clearing
+                st.info("Form has been cleared. You can submit another candidate.")
 
             else: st.error("Analysis indicated 'Matched', but failed to create/retrieve the Candidate Record ID from the backend.")
         else:
             st.error(f"❗️ Unknown Status Received: '{analysis_status}' (Reason: {reason})")
 
+        # Reset submitted_flag after processing results
         st.session_state.submitted_flag = False
+        # Ensure analysis_result is reset so it doesn't redisplay on simple interaction
+        # st.session_state.analysis_result = None # Or leave it to show last result until new submission
+
 
 # --- Footer ---
 st.divider()

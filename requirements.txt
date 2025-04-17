@@ -34,5 +34,6 @@ python-dotenv
 pydantic
 PyMuPDF         # For fitz
 python-docx    # For docx
+google-generativeai
 
 # Note: Removed pandas and passlib[bcrypt] previously

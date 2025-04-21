@@ -422,7 +422,7 @@ else:
         with col2a:
             # Assign keys to capture values on submit
             cand_name_submitted = st.text_input("Candidate Name*", placeholder="e.g., Jane Doe", key="cand_name_in_form")
-            email_submitted = st.text_input("Candidate Email (Optional)", placeholder="e.g., name@example.com", key="cand_email_in_form")
+            email_submitted = st.text_input("Vendor Email", placeholder="e.g., name@example.com", key="cand_email_in_form")
         with col2b:
             comp_name_submitted = st.text_input("Company Name*", placeholder="e.g., Tech Solutions Inc.", key="company_name_in_form")
             payout_submitted = st.number_input("Candidate Budget in INR*", min_value=0.0, step=1000.0, format="%.0f", placeholder="e.g., 200000", help="Enter expected monthly compensation in INR.", key="candidate_payout_pm_in_form", value=None) # Explicitly set default to None

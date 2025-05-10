@@ -429,7 +429,7 @@ def run_c2c_analysis(
             candidate_expected_payout_pm=candidate_expected_payout_pm,
             candidate_applying_for_location=candidate_applying_for_location,
             candidate_current_location=candidate_current_location,
-            candidate_relocation_status=relocation_status # Corrected key here
+            candidate_relocation_status=relocation_status # This is the keyword argument for the placeholder
             )
         backend_report, report_error = call_llm(report_prompt, MAX_TOKENS_BACKEND_REPORT, temperature=0.2)
         logger.info("Logging Backend Report interaction...")

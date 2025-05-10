@@ -330,14 +330,14 @@ def run_c2c_analysis(
     candidate_name: str, company_name: str, candidate_expected_payout_pm: float,
     candidate_applying_for_location: str, # Target location specified by user
     candidate_current_location: str,
-    relocation_status: str,
+    relocation_status: str, # This is the variable passed from the frontend
     grad_year_confirmed_by_user: str
 ) -> Dict[str, Any]:
 # *** END FINAL SIGNATURE ***
     start_time = time.time(); present_date_str = datetime.now().strftime("%Y-%m-%d")
     logger.info(f"--- Starting C2C Analysis (V27.1 - New Airtable Schema) ---") # Incremented version
     logger.info(f"Requirement: '{position_title}', CV: '{cv_filename}'"); logger.info(f"Cand: '{candidate_name}', Comp: '{company_name}', Email: {candidate_email}");
-    logger.info(f"Target Loc: '{candidate_applying_for_location}', Current Loc: '{candidate_current_location}', Relo Status: '{relocation_status}'")
+    logger.info(f"Target Loc: '{candidate_applying_for_location}', Current Loc: '{candidate_current_location}', Relo Status: '{relocation_status}'") # Uses the passed 'relocation_status'
     logger.info(f"Payout: {candidate_expected_payout_pm}, Grad Conf: {grad_year_confirmed_by_user}")
     log_record_id: Optional[str] = None; candidate_record_id: Optional[str] = None; llm_response_record_id: Optional[str] = None
     final_result_dict: Dict[str, Any] = { "status": "error", "reason": "Init fail.", "questions": [], "candidate_id": None, "error_message": "Init fail.", "llm_response_log_id": None }
@@ -419,15 +419,17 @@ def run_c2c_analysis(
 
         logger.info("--- Preliminary Strict Checks PASSED ---"); ac.update_application_log(log_record_id, {"Processing Status": "Preliminary Checks Passed"})
         logger.info("--- Starting Stage 2: Generating Detailed Backend Report ---"); ac.update_application_log(log_record_id, {"Processing Status": "Generating Backend Report"})
-        # Use the new requirement_text variable and pass all location context
+        
         report_prompt = GENERATE_DETAILED_REPORT_PROMPT.format(
-            requirement_text=requirement_text, # Pass Requirement Text as jd_text for the prompt
-            cv_text=extracted_cv_text, present_date_str=present_date_str,
-            candidate_name=candidate_name, company_name=company_name,
+            requirement_text=requirement_text,
+            cv_text=extracted_cv_text,
+            present_date_str=present_date_str,
+            candidate_name=candidate_name,
+            company_name=company_name,
             candidate_expected_payout_pm=candidate_expected_payout_pm,
-            candidate_applying_for_location=candidate_applying_for_location, # Pass target location
+            candidate_applying_for_location=candidate_applying_for_location,
             candidate_current_location=candidate_current_location,
-            relocation_status=relocation_status
+            candidate_relocation_status=relocation_status # Corrected key here
             )
         backend_report, report_error = call_llm(report_prompt, MAX_TOKENS_BACKEND_REPORT, temperature=0.2)
         logger.info("Logging Backend Report interaction...")
@@ -439,35 +441,30 @@ def run_c2c_analysis(
             if llm_response_record_id: logger.info(f"LLM Response log created: {llm_response_record_id}")
             else: logger.error("Failed create LLM Response log record.")
         else: logger.warning("LLM_TABLE_ID not set. Skipping LLM Response log.")
-        # Corrected fallback error logging
+        
         if report_error and not llm_response_record_id:
              error_msg_fallback = f"Checks passed, but failed generate/log report: {report_error}"; logger.error(error_msg_fallback);
-             existing_log = ac.get_record(ac.LOGS_TABLE_ID, log_record_id); # Fetch log record here before check
-             if existing_log and not existing_log.get('fields', {}).get("Error details"): # Check using string name
-                 ac.update_application_log(log_record_id, {"Error details": error_msg_fallback}) # Update using string name
+             existing_log = ac.get_record(ac.LOGS_TABLE_ID, log_record_id); 
+             if existing_log and not existing_log.get('fields', {}).get("Error details"): 
+                 ac.update_application_log(log_record_id, {"Error details": error_msg_fallback}) 
 
-        # If report generation failed, we should probably stop here and indicate error?
-        # For now, proceeding to create candidate record even if report failed, but logging the error.
         if report_error:
             logger.error(f"Backend report generation failed: {report_error}. Proceeding to create candidate record but flagging.")
-            # Optionally update log here too if needed
 
         ac.update_application_log(log_record_id, {"Processing Status": "Creating Candidate Record"})
-        # Use Enum names as keys for candidate_data, matching create_successful_candidate expectation
         candidate_data_for_airtable = {
             ac.CandFields.ASSOCIATED_LOG_ENTRY.name: [log_record_id],
-            ac.CandFields.APPLIED_POSITION.name: [requirement_record_id] if requirement_record_id else [], # Link to Requirement record
+            ac.CandFields.APPLIED_POSITION.name: [requirement_record_id] if requirement_record_id else [],
             ac.CandFields.NAME.name: candidate_name,
             ac.CandFields.COMPANY_NAME.name: company_name,
-            ac.CandFields.LLM_MATCH_REASON.name: "Passed prelim checks (Salary, Exp, Edu, Location)." + (" Report generation failed." if report_error else ""), # Append warning if report failed
-            ac.CandFields.INTERVIEW_STATUS.name: "Pending" # Use new Enum name
+            ac.CandFields.LLM_MATCH_REASON.name: "Passed prelim checks (Salary, Exp, Edu, Location)." + (" Report generation failed." if report_error else ""),
+            ac.CandFields.INTERVIEW_STATUS.name: "Pending"
          }
         candidate_record_id = ac.create_successful_candidate(candidate_data_for_airtable)
         
         if candidate_record_id:
             logger.info(f"Created candidate record: {candidate_record_id}");
             
-            # --- Added logic to update the 'Unique generated ID' field ---
             if CAND_UNIQUE_GENERATED_ID_FIELD:
                 update_unique_id_payload = {CAND_UNIQUE_GENERATED_ID_FIELD: candidate_record_id}
                 updated_cand_rec = ac.update_record(ac.CANDS_TABLE_ID, candidate_record_id, update_unique_id_payload)
@@ -477,9 +474,7 @@ def run_c2c_analysis(
                     logger.error(f"Failed to update candidate record '{candidate_record_id}' with its own ID in 'Unique generated ID' field.")
             else:
                 logger.warning("CAND_UNIQUE_GENERATED_ID_FIELD not configured in airtable_client. Skipping update of unique ID field.")
-            # --- End of added logic ---
 
-            # Use correct field name for update
             link_cand_success = ac.update_application_log(log_record_id, {"Associated Candidate Record": [candidate_record_id]});
             if link_cand_success: final_status = "matched"; final_reason = "Candidate passed preliminary checks."; final_questions = clarification_reasons
             else: logger.warning(f"Failed link Cand Rec {candidate_record_id} to Log {log_record_id}."); final_status = "matched"; final_reason = "Passed preliminary checks, link failed."; final_questions = clarification_reasons
@@ -489,11 +484,11 @@ def run_c2c_analysis(
         final_log_details_content = None
         if final_airtable_outcome != "Matched": final_log_details_content = final_reason or f"Analysis complete: {final_airtable_outcome}"
         log_updates = {"Processing Status": "Analysis Complete", "Final Outcome": final_airtable_outcome}
-        # Use correct string name "Error details" for the key when updating
+        
         if final_log_details_content: log_updates["Error details"] = final_log_details_content[:100000]
-        # Also ensure the backend report gets logged if it exists, even on final update
-        if backend_report and ac.fields.LOG_BACKEND_REPORT: # Check if field ID exists
-            log_updates[ac.fields.LOG_BACKEND_REPORT] = backend_report[:100000] # Log report to Application Log
+        
+        if backend_report and ac.fields.LOG_BACKEND_REPORT: 
+            log_updates[ac.fields.LOG_BACKEND_REPORT] = backend_report[:100000]
 
         update_success = ac.update_application_log(log_record_id, log_updates)
         if not update_success: logger.error(f"CRITICAL: Failed update final status log {log_record_id}.")
@@ -502,7 +497,7 @@ def run_c2c_analysis(
     except Exception as e:
         logger.exception("Unexpected error during main orchestration."); error_msg = f"System error: {type(e).__name__}: {str(e)}"; final_result_dict["status"] = "error"; final_result_dict["error_message"] = error_msg; final_result_dict["reason"] = error_msg
         if log_record_id:
-            try: ac.update_application_log(log_record_id, {"Processing Status": "Error - System", "Final Outcome": "Error", "Error details": error_msg}) # Use correct key name
+            try: ac.update_application_log(log_record_id, {"Processing Status": "Error - System", "Final Outcome": "Error", "Error details": error_msg}) 
             except Exception as log_e: logger.error(f"CRITICAL: Failed log system error to log {log_record_id}: {log_e}")
     end_time = time.time()
     logger.info(f"--- C2C Analysis Finished: '{cv_filename}'. Status: {final_result_dict.get('status', 'unknown')}. Duration: {end_time - start_time:.2f}s ---")

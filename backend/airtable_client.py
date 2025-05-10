@@ -613,7 +613,7 @@ if not ADMIN_TABLE_ID or not ADMIN_TABLE_ID.startswith("tbl"):
     logger.warning("ADMIN_TABLE_ID invalid or not set in environment variables/secrets. Admin functions might fail.")
 
 
-# --- Field ID Management (No changes needed in this section) ---
+# --- Field ID Management ---
 class FieldIdEnum(Enum):
     def __str__(self): return str(self.value)
 
@@ -628,13 +628,13 @@ class LlmRespFields(FieldIdEnum): # LLM Responses (tblM5foLOcBIgSdRB)
 
 class CandFields(FieldIdEnum): # Successful Candidates (tbl1RYRfDafP5vO9O)
     NAME = "fld6w5Z4tbrUxRT1m"; COMPANY_NAME = "fldRZ7nBj9GJVR5wK"; ASSOCIATED_LOG_ENTRY = "fldhOdTPV4QvA5DbE"; APPLIED_POSITION = "fldkaE74Z2LtsgAN9"; LLM_MATCH_REASON = "fld7XOs2Zu7mVBdmL"; INTERVIEW_STATUS = "fldPS2HzfkL0EbpbY"
-    UNIQUE_GENERATED_ID = "fldGt1Yl4tszUGuQo" # Added this line
+    UNIQUE_GENERATED_ID = "fldGt1Yl4tszUGuQo" # Field ID for 'Unique generated ID'
 
 class AdminFields(FieldIdEnum): # Admin Users (ID from env vars/secrets)
      USERNAME = "fld???????????????" # Placeholder - Replace with actual ID if using admin features
      PASSWORD_HASH = "fld???????????????" # Placeholder - Replace with actual ID if using admin features
 
-# --- `fields` class definition (No changes needed in this section) ---
+# --- `fields` class definition ---
 class fields:
     """Provides string access to Field IDs via class attributes. Returns None if not defined."""
     REQ_TITLE = str(ReqFields.REQUIREMENT_TITLE.value); REQ_LOCATION = str(ReqFields.LOCATION.value); REQ_MIN_EXPERIENCE = str(ReqFields.MIN_EXPERIENCE.value); REQ_STATUS = str(ReqFields.STATUS.value); REQ_JD_TEXT = str(ReqFields.JD_TEXT.value); REQ_BUDGET = str(ReqFields.BUDGET.value)
@@ -642,7 +642,7 @@ class fields:
     LOG_CANDIDATE_EMAIL = str(LogFields.CANDIDATE_EMAIL.value); LOG_PROCESSING_STATUS = str(LogFields.PROCESSING_STATUS.value); LOG_FINAL_OUTCOME = str(LogFields.FINAL_OUTCOME.value); ERROR_DETAILS = str(LogFields.ERROR_DETAILS.value); LOG_BACKEND_REPORT = str(LogFields.BACKEND_ANALYSIS_REPORT.value); LOG_ASSOCIATED_LLM_RESPONSE = str(LogFields.ASSOCIATED_LLM_RESPONSE.value); LOG_ASSOCIATED_CANDIDATE_RECORD = str(LogFields.ASSOCIATED_CANDIDATE_RECORD.value)
     LLM_ASSOCIATED_LOG_ENTRY = str(LlmRespFields.ASSOCIATED_LOG_ENTRY.value) if LLM_TABLE_ID else None; LLM_BACKEND_ANALYSIS_REPORT = str(LlmRespFields.BACKEND_ANALYSIS_REPORT.value) if LLM_TABLE_ID else None; LLM_FULL_PROMPT_SENT = str(LlmRespFields.FULL_PROMPT_SENT.value) if LLM_TABLE_ID else None; LLM_RAW_RESPONSE_RECEIVED = str(LlmRespFields.RAW_RESPONSE_RECEIVED.value) if LLM_TABLE_ID else None; LLM_PARSING_STATUS = str(LlmRespFields.PARSING_STATUS.value) if LLM_TABLE_ID else None
     CAND_NAME = str(CandFields.NAME.value); CAND_COMPANY_NAME = str(CandFields.COMPANY_NAME.value); CAND_ASSOCIATED_LOG_ENTRY = str(CandFields.ASSOCIATED_LOG_ENTRY.value); CAND_APPLIED_POSITION = str(CandFields.APPLIED_POSITION.value); CAND_LLM_MATCH_REASON = str(CandFields.LLM_MATCH_REASON.value); CAND_INTERVIEW_STATUS = str(CandFields.INTERVIEW_STATUS.value)
-    CAND_UNIQUE_GENERATED_ID = str(CandFields.UNIQUE_GENERATED_ID.value) # Added this line
+    CAND_UNIQUE_GENERATED_ID = str(CandFields.UNIQUE_GENERATED_ID.value) if CANDS_TABLE_ID else None # Added for Unique Generated ID
     ADMIN_USERNAME = str(AdminFields.USERNAME.value) if ADMIN_TABLE_ID and hasattr(AdminFields, 'USERNAME') and not AdminFields.USERNAME.value.startswith("fld????") else None
     ADMIN_PASSWORD_HASH = str(AdminFields.PASSWORD_HASH.value) if ADMIN_TABLE_ID and hasattr(AdminFields, 'PASSWORD_HASH') and not AdminFields.PASSWORD_HASH.value.startswith("fld????") else None
 
@@ -659,7 +659,7 @@ class fields:
             "llm_associated_log_entry": "LLM_ASSOCIATED_LOG_ENTRY", "llm_backend_analysis_report": "LLM_BACKEND_ANALYSIS_REPORT", "full_prompt_sent": "LLM_FULL_PROMPT_SENT",
             "raw_response_received": "LLM_RAW_RESPONSE_RECEIVED", "parsing_status": "LLM_PARSING_STATUS", "cand_name": "CAND_NAME", "cand_company_name": "CAND_COMPANY_NAME",
             "interview_scheduling_status": "CAND_INTERVIEW_STATUS", "cand_interview_status": "CAND_INTERVIEW_STATUS",
-            # No need to add CAND_UNIQUE_GENERATED_ID here as it's typically not referred to by common name
+            # CAND_UNIQUE_GENERATED_ID is usually accessed directly by its field object, not a common name.
         }
         normalized_name = re.sub(r'[\s-]+', '_', field_name).lower().strip()
         attribute_name = name_to_attr_map.get(normalized_name)
